@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark" />
+    <link rel="stylesheet" href="https://necolas.github.io/normalize.css/8.0.1/normalize.css" />
+    <link rel="stylesheet" href="static/my.css" />
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/htmx-ext-ws@2.0.2" crossorigin="anonymous"></script>
+    <script src="static/keyboard.js"></script>
+    <script src="static/terminal.js"></script>
+    <title>🥔 PotatoSSH</title>
+    <script>
+        htmx.defineExtension('ask', {
+            onEvent: function(name, event) {
+                console.log("kuuurczaki")
+                if (name !== 'htmx:configRequest')
+                    return;        
+
+                const elt = event.detail.elt;
+                const askElt = elt.closest('[hx-ask]') || elt.closest('[data-hx-ask]');
+                
+                if (askElt) {
+                    const question = askElt.getAttribute('hx-ask') || askElt.getAttribute('data-hx-ask');
+                    const suggestion = askElt.getAttribute('hx-ask-default') || askElt.getAttribute('data-hx-ask-default');
+                    const answer = prompt(question, suggestion || undefined);
+
+                    if (answer !== null) //null when canceled
+                        event.detail.headers['HX-Prompt'] = answer;
+                }
+            }
+        });
+        document.addEventListener("DOMContentLoaded", function(event) {
+            let vhBtn = document.getElementById("vh")
+            vhBtn.addEventListener("click", vhToggle);
+        });
+        function vhToggle() {
+            let article = document.getElementsByTagName("section")[0]
+            if (article.classList.contains("vertical")) {
+                this.innerHTML = "↔️"
+                article.classList.remove("vertical");
+            } else {
+                this.innerHTML = "↕️"
+                article.classList.add("vertical");
+            }
+        }
+    </script>
+  </head>
+  <body>
+    <style id="theme_style">
+        {{ block "theme_def" .Settings.Theme }}
+        :root {
+            --background-opacity: {{ .Background.String }}BF;
+            --background: {{ .Background.String }};
+            --black: {{ .Black.String }};
+            --red: {{ .Red.String }};
+            --green: {{ .Green.String }};
+            --yellow: {{ .Yellow.String }};
+            --blue: {{ .Blue.String }};
+            --magenta: {{ .Purple.String }};
+            --cyan: {{ .Cyan.String }};
+            --white: {{ .White.String }};
+            --bblack: {{ .BrightBlack.String }};
+            --bred: {{ .BrightRed.String }};
+            --bgreen: {{ .BrightGreen.String }};
+            --byellow: {{ .BrightYellow.String }};
+            --bblue: {{ .BrightBlue.String }};
+            --bmagenta: {{ .BrightPurple.String }};
+            --bcyan: {{ .BrightCyan.String }};
+            --bwhite: {{ .BrightWhite.String }};
+        }
+        {{ end }}
+    </style>
+    {{ define "theme_oob" }}
+        <style id="theme_style" hx-swap-oob="true">
+            {{ template "theme_def" .}}
+        </style>
+    {{ end }}
+    <style id="fontsize_style">
+        {{ block "fontsize_def" .Settings.FontSize }}
+        :root {
+            --fontsize: {{.}}pt;
+        }
+        {{ end }}
+    </style>
+    {{ define "fontsize_oob" }}
+        <style id="fontsize_style" hx-swap-oob="true">
+            {{ template "fontsize_def" .}}
+        </style>
+    {{ end }}
+    <main>
+        <aside>
+            <header>
+                <h2>🥔 PotatoSSH</h2>
+                <nav>
+                    <button title="Add server" id="new">🌍</button>
+                    <button title="Orientation" id="vh">↔️</button>
+                    <button title="Light mode">☀️</button>
+                    <button title="Settings" id="settings_btn">🛠️</button>
+                </nav>
+            </header>
+            <nav>
+                <header>servers</header>
+                <ul id="server_list">
+                    {{ block "server_list" .Servers }}
+                        {{ block "list" . }}
+                            {{range .}}
+                                {{ if .Dir }}
+                                    <li class="dir">
+                                        <header>{{ .Name }}</header>
+                                        <ul>
+                                            {{ template "list" .Childs }}
+                                        </ul>
+                                    </li>
+                                {{ else }}
+                                    <li class="server">
+                                        <header>
+                                            {{ if openInNewWindowEnabled }}
+                                            <span hx-post="/connection/{{ .Server.ID }}" hx-vals='{"newwindow": "true"}' hx-target="#workspace">{{ .Name }}</span>
+                                            {{ else }}
+                                            <span hx-post="/connection/{{ .Server.ID }}" hx-target="#workspace">{{ .Name }}</span>
+                                            {{ end }}
+                                        </header>
+                                        <button>⋮</button>
+                                        <menu>
+                                            <div class="toolbar">
+                                                {{ if openInNewWindowEnabled }}
+                                                <button title="Open in new tab" hx-post="/connection/{{ .Server.ID }}" hx-target="#workspace">🗂️</button>
+                                                {{ else }}
+                                                <button title="Open in new window" hx-post="/connection/{{ .Server.ID }}" hx-vals='{"newwindow": "true"}' hx-target="#workspace">🪟</button>
+                                                {{ end }}
+                                                <button title="Edit">✏️</button>
+                                                <button title="Delete" hx-delete="/server/{{ .Server.ID }}" hx-target="nav > ul" hx-confirm="Delete {{ .Server.Name }}?">🗑️</button>
+                                                <button title="History">📜</button>
+                                            </div>
+                                            <ul class="stats">
+                                                <li>🟢 {{ .Server.Address }}</li>
+                                                <li>🙋🏻‍♂️ {{ .Server.User }}</li>
+                                                <li>📶 20ms</li>
+                                                <li>🏷️ SSH-2-OpenSSH</li>
+                                            </ul>
+                                        </menu>
+                                    </li>
+                                {{ end }}
+                            {{ end }}
+                        {{ end }}
+                        <script>
+                            var dirs = document.querySelectorAll(".dir header")
+                            dirs.forEach(dir => {
+                                dir.addEventListener("click", function() {
+                                    if (this.parentNode.classList.contains("open")) {
+                                        this.parentNode.classList.remove("open")
+                                    } else {
+                                        let opened = document.querySelector(".open")
+                                        if (opened != null && !opened.contains(this.parentNode)) {
+                                            opened.classList.remove("open")
+                                        }
+                                        this.parentNode.classList.add("open")
+                                    }
+                                })
+                            });
+                        </script>
+                    {{ end }}
+                </ul>
+                {{ define "server_list_oob" }}
+                <ul id="server_list" hx-swap-oob="true">
+                    {{ template "server_list" .}}
+                </ul>
+                {{ end }}
+            </nav>
+            <footer>
+                <p>version: 0.0.1</p>
+            </footer>
+        </aside>
+        <article>
+            <section id="workspace">
+                {{define "title_oob"}}
+                            <label hx-ext="ask" id="title_{{ .Id }}" for="tab_{{ .Id }}" title="{{ .Server.Name }}" hx-trigger="dblclick" hx-ask="New title (leave blank to re-enable dynamic title):" hx-ask-default="{{ .Terminal.Title }}" hx-post="/title/{{ .Id }}" hx-swap-oob="true">💻 {{ .Terminal.Title }}</label>
+                {{ end }}
+                {{ block "workspace" .Windows }}
+                    {{ $windows := . }}
+                    {{ range $i, $w := . }}
+                    <div data-id="{{ $i }}" {{ if $w.Active }}class="active"{{ end }}>
+                        <header class="wheader">
+                            {{ $tablen := len $w.Tabs }}
+                            {{ $lasttab := len (slice (printf "%*s" $tablen "") 1)}}
+                            {{ range $j, $t := $w.Tabs }}
+                            {{ $sessionid := $t.Session.Id }}
+                            <label hx-ext="ask" id="title_{{ $sessionid }}" for="tab_{{ $sessionid }}" title="{{ .Server.Name }}" hx-trigger="dblclick" hx-post="/title/{{ $sessionid }}" hx-ask="New title (leave blank to re-enable dynamic title):" hx-ask-default="{{ .Session.Terminal.Title }}">💻 {{ .Session.Terminal.Title }}</label>
+                            <div class="wbuttons">
+                                <button class="close" title="Move">🗗</button>
+                                <menu>
+                                    <div class="toolbar">
+                                        <button {{ if ne $j 0 }}hx-post="/move/left/{{ $sessionid }}" hx-target="#workspace"{{ else }}disabled{{ end }} title="Move tab to left">⬅</button>
+                                        <button {{ if gt $tablen 1 }}hx-post="/move/newwindow/{{ $sessionid }}" hx-target="#workspace"{{ else }}disabled{{ end }} title="New window">🗖</button>
+                                        <button {{ if lt $j $lasttab }}hx-post="/move/right/{{ $sessionid }}" hx-target="#workspace"{{ else }}disabled{{ end }} title="Move tab to right">➡</button>
+                                    </div>
+                                    <div class="minigrid">
+                                        {{ range $k, $w := $windows }}
+                                        {{ $windowname := len (printf "a%*s" $k "") }}
+                                        <div {{ if ne $i $k }}hx-post="/move/window/{{ $sessionid }}/{{ $k }}" hx-target="#workspace"{{ end }} title="Switch to window {{ $windowname }}" {{ if eq $i $k }}class="disabled"{{ end }}>{{ $windowname }}</div>
+                                        {{ end }}
+                                    </div>
+                                </menu>
+                                <button hx-delete="/connection/{{ $sessionid }}" hx-target="#workspace" class="close" title="Close">✖</button>
+                            </div>
+                            {{ end }}
+                        </header>
+                        {{range $w.Tabs}}
+                            <input id="tab_{{ .Session.Id }}" type="radio" name="tabs{{ $i }}" {{ if .Checked }}checked{{ end }} hx-post="/active/tab/{{ .Session.Id }}">
+                            <div class="tab" hx-ext="ws" ws-connect="/connection/{{ .Session.Id }}">
+                            {{ block "codeblock" .Session }}
+                                <code id="session_{{ .Id }}">{{ .Terminal.String }}</code>
+                            {{ end}}
+                            </div>
+                        {{ end }}
+                    </div>
+                    {{ end }}
+                {{ end }}
+            </section>
+            <script>
+                function makeItActive(target) {
+                    if (!target.classList.contains("active")) {
+                        let active = document.querySelector(".active")
+                        if (active != null) {
+                            active.classList.remove("active");
+                        }
+                        target.classList.add("active")
+                        var xhttp = new XMLHttpRequest();
+                        xhttp.onreadystatechange = function() {
+                            if (this.readyState == XMLHttpRequest.DONE && this.status != 200) {
+                                alert(this.responseText);
+                            }
+                        };
+                        xhttp.open("POST", "/active/window/" + target.dataset.id.toString(), true);
+                        xhttp.send()
+                    }
+                }
+                const sockets = new Map();
+                document.body.addEventListener('htmx:wsOpen', function(evt) {
+                    let sessionId =  evt.target.getElementsByTagName("code")[0].id
+                    const terminal = new Terminal(sessionId, evt.target, evt.detail.socketWrapper)
+                    sockets.set(sessionId, terminal)
+                    // makeItActive(evt.target.parentNode)
+                    evt.target.parentNode.addEventListener('click', function(e) {
+                        makeItActive(this)
+                    });
+                });
+                document.body.addEventListener('htmx:wsClose', function(evt) {
+                    let sessionId =  evt.target.getElementsByTagName("code")[0].id
+                    evt.target.getElementsByTagName("code")[0].innerHTML = "Disconnected."
+                    sockets.delete(sessionId)
+                });
+                var isScrolledToBottom = false
+                document.body.addEventListener('htmx:wsBeforeMessage', function(evt) {
+                    isScrolledToBottom = evt.target.scrollHeight - evt.target.clientHeight <= evt.target.scrollTop + 1
+                });
+                document.body.addEventListener('htmx:wsAfterMessage', function(evt) {
+                    if (isScrolledToBottom) {                        
+                        evt.target.scrollTop = evt.target.scrollHeight - evt.target.clientHeight
+                    }
+                });
+
+                function fontSizeChanged() {
+                    UpdateFontDimensions();
+                    sockets.forEach(function(term, sessionId) {
+                        term.UpdateSize()
+                    });
+                }
+            </script>
+        </article>
+    </main>
+    <dialog id="new_dialog">
+        <form hx-post="/server" hx-target="nav > ul" autocomplete="off" id="new_form" method="dialog">
+            <header>
+                <h5>New server</h5>
+            <button id="new_close_btn" type="button" class="close">✖</button>
+            </header>
+            {{ block "dialog_name" . }}
+                {{ if .Error}}
+                <p hx-target="this" hx-swap="outerHTML" class="error">
+                    <input id="new_name" hx-on:htmx:validation:validate="this.setCustomValidity('{{ .Error }}'); htmx.find('#new_form').reportValidity()" hx-post="/validate/name" hx-trigger="keyup changed delay:500ms" hx-sync="closest form:abort" type="text" id="name" name="name" placeholder="Server name" required {{ if .Input }}value="{{ .Input }}" {{ end }}>
+                </p>
+                {{ else }}
+                <p hx-target="this" hx-swap="outerHTML">
+                    <input id="new_name" hx-post="/validate/name" hx-trigger="keyup changed delay:500ms" hx-sync="closest form:abort" type="text" id="name" name="name" placeholder="Server name" required {{ if .Input }}value="{{ .Input }}" {{ end }} >
+                </p>
+                {{ end }}
+            {{ end }}
+            <p>
+            <input type="text" id="address" name="address" placeholder="Address" required>
+            <span>:</span>
+            <input type="number" min="1" max="65535" id="port" name="port" placeholder="Port" value="22" required>
+            </p>
+            <p>
+                <input type="text" id="user" name="user" placeholder="User" required>
+            </p>
+            <p>
+                <input type="password" id="password" name="password" placeholder="Password" required>
+            </p>
+            <p>
+                <button>✅</button>
+            </p>
+        </form>
+    </dialog>
+    <dialog id="settings">
+        <form id="settings_form" method="dialog" hx-post="/settings" autocomplete="on" hx-on::after-request="fontSizeChanged()">
+            {{ block "settings_form" . }}
+            <header>
+                <h5>Settings</h5>
+                <button id="settings_close_btn" type="button" class="close" hx-get="/preview" hx-target=".preview" hx-swap="outerHTML">✖</button>
+            </header>
+            <p>
+                <label for="theme" title="Theme">🎨</label>
+                <select name="theme" id="theme" hx-get="/preview" hx-target=".preview" hx-swap="outerHTML" hx-include="[name='font_size']">
+                    {{ $current_theme := .Settings.Theme.Name }}
+                    {{ range $i, $t := .Themes }}
+                        <option {{ if eq $t.Name $current_theme }}selected{{ end }} value="{{ $i }}">{{ $t.Name }}</option>
+                    {{ end }}
+                </select>
+            </p>
+            <p>
+                <label for="font_size" title="Font size">🗚</label>
+                <span class="slider">
+                    <input name="font_size" value="{{ .Settings.FontSize }}" type="range" min="6" max="16" step="1" id="font_size" name="user_name" list="sizes" hx-get="/preview" hx-target=".preview" hx-swap="outerHTML" hx-include="[name='theme']"/>
+                    <datalist id="sizes">
+                        <option value="6" label="6"></option>
+                        <option value="8" label="8"></option>
+                        <option value="10" label="10"></option>
+                        <option value="12" label="12"></option>
+                        <option value="14" label="14"></option>
+                        <option value="16" label="16"></option>
+                    </datalist>
+                </span>
+            </p>
+            <p>
+                <label for="new_behavior" title="New connections behavior">🚀</label>
+                <span class="toggle">
+                    <label for="new_behavior">New tab</label>
+                    <input {{ if .Settings.OpenInNewWindow }}checked{{ end }} type="checkbox" role="switch" id="new_behavior" name="new_behavior">
+                    <label for="new_behavior">New window</label>
+                </span>
+            </p>
+            <p>
+                <button>✅</button>
+            </p>
+            {{ block "settings_preview" .Settings }}
+            <div {{if .Theme }}style="  --background-opacity: {{ .Theme.Background.String }}BF; --background: {{ .Theme.Background.String }}; --black: {{ .Theme.Black.String }}; --red: {{ .Theme.Red.String }}; --green: {{ .Theme.Green.String }}; --yellow: {{ .Theme.Yellow.String }}; --blue: {{ .Theme.Blue.String }}; --magenta: {{ .Theme.Purple.String }}; --cyan: {{ .Theme.Cyan.String }}; --white: {{ .Theme.White.String }}; --bblack: {{ .Theme.BrightBlack.String }}; --bred: {{ .Theme.BrightRed.String }}; --bgreen: {{ .Theme.BrightGreen.String }}; --byellow: {{ .Theme.BrightYellow.String }}; --bblue: {{ .Theme.BrightBlue.String }}; --bmagenta: {{ .Theme.BrightPurple.String }}; --bcyan: {{ .Theme.BrightCyan.String }}; --bwhite: {{ .Theme.BrightWhite.String }};"{{ end }} class="preview">
+                <code style="font-size: {{ .FontSize }}pt"><span class="bold fg_green">user@server</span>:<span class="bold fg_blue">~</span>$ ./colors
+   0<span class="bold">   1</span><span class="dim">   2</span><span class="italic">   3</span><span class="underline">   4</span><span class="blink">   5   6</span><span class="invert">   7</span>   8<span class="strike">   9</span>
+  10  11  12  13  14  15  16  17  18  19
+  20  21  22  23  24  25  26  27  28  29
+<span class="fg_black">  30</span><span class="fg_red">  31</span><span class="fg_green">  32</span><span class="fg_yellow">  33</span><span class="fg_blue">  34</span><span class="fg_magenta">  35</span><span class="fg_cyan">  36</span><span class="fg_white">  37</span>  38  39
+<span class="bg_black">  40</span><span class="bg_red">  41</span><span class="bg_green">  42</span><span class="bg_yellow">  43</span><span class="bg_blue">  44</span><span class="bg_magenta">  45</span><span class="bg_cyan">  46</span><span class="bg_white">  47</span>  48  49
+  50  51  52  53  54  55  56  57  58  59
+  60  61  62  63  64  65  66  67  68  69
+  70  71  72  73  74  75  76  77  78  79
+  80  81  82  83  84  85  86  87  88  89
+<span class="fg_bright fg_black">  90</span><span class="fg_bright fg_red">  91</span><span class="fg_bright fg_green">  92</span><span class="fg_bright fg_yellow">  93</span><span class="fg_bright fg_blue">  94</span><span class="fg_bright fg_magenta">  95</span><span class="fg_bright fg_cyan">  96</span><span class="fg_bright fg_white">  97</span>  98  99
+<span class="bg_bright bg_black"> 100</span><span class="bg_bright bg_red"> 101</span><span class="bg_bright bg_green"> 102</span><span class="bg_bright bg_yellow"> 103</span><span class="bg_bright bg_blue"> 104</span><span class="bg_bright bg_magenta"> 105</span><span class="bg_bright bg_cyan"> 106</span><span class="bg_bright bg_white"> 107</span> 108
+<span class="bold fg_green">user@server</span>:<span class="bold fg_blue">~</span>$ <span class="cursor"> </span></code>
+            </div>
+            {{ end }}
+            <script>
+                document.getElementById("settings_close_btn").addEventListener("click", function() {
+                    console.log("settings closee!")
+                    settingsDialog.close()
+                });
+            </script>
+            {{ end }}
+        </form>
+    </dialog>
+    <script>
+        let settingsDialog = document.getElementById("settings")
+        let newBtn = document.getElementById("new")
+        let settingsBtn = document.getElementById("settings_btn")
+        let settings_form = document.getElementById("settings_form")
+        let last_active = null
+        let form = document.getElementById("new_form")
+        let dialog = document.getElementById("new_dialog")
+
+        let close = document.getElementById("new_close_btn")
+
+        newBtn.addEventListener("click", function(){
+            last_active = document.querySelector(".active")
+            if (last_active != null) {
+                last_active.classList.remove("active");
+            }
+            form.reset()
+            let input = document.getElementById("new_name") 
+            input.value = ""
+            dialog.showModal()
+            input.focus()
+        })
+        dialog.addEventListener("close", function() {
+            if (last_active != null) {
+                last_active.classList.add("active")
+            }
+        })
+        close.addEventListener("click", function() {
+            dialog.close()
+        });
+     
+        form.addEventListener("htmx:afterRequest", function(evt) {
+            if (evt.detail.pathInfo.requestPath == "/server") {
+                dialog.close()
+            }
+        });
+
+        settings_form.addEventListener("htmx:afterRequest", function(evt) {
+            if (evt.detail.pathInfo.requestPath == "/settings") {
+                settingsDialog.close()
+            }
+        });
+
+        settingsDialog.addEventListener("close", function() {
+            settings_form.reset()
+        })
+
+        settingsBtn.addEventListener("click", function(){
+            settingsDialog.showModal()
+        });
+    </script>
+  </body>
+</html>
