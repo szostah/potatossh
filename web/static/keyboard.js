@@ -38,7 +38,6 @@ class Keyboard {
                         keyPressed = true;
                     }
                     else if (e.key.length === 1) {
-                        buffor += e.key
                         this.keyFunc(e.key)
                         keyPressed = true;
                     }

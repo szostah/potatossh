@@ -97,7 +97,7 @@ func (s *Session) Start() error {
 		return err
 	}
 
-	if err := s.ssh_session.Start("/bin/bash"); err != nil {
+	if err := s.ssh_session.Shell(); err != nil {
 		return err
 	}
 
