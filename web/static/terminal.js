@@ -1,18 +1,12 @@
-var char_width = 0;
-var char_height = 0
+var char_width = 0.0;
+var char_height = 0.0;
 
 function UpdateFontDimensions() {
     const span = document.createElement("code");
-    span.innerHTML = "x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x<br>x"
-    span.style.width = "1ch";
-    span.style.position = "fixed";
-
-    span.style.fontFamily = "monospace";
-    span.style.lineHeight = "1.2";
-
+    span.innerHTML = "X<br>Y<br>Z<br>X<br>Y<br>Z<br>X<br>Y<br>Z<br>X"
     document.body.appendChild(span);
     char_width = span.getBoundingClientRect().width;
-    char_height = span.getBoundingClientRect().height/160;
+    char_height = span.getBoundingClientRect().height/10.0;
     document.body.removeChild(span);
 }
 
@@ -54,20 +48,21 @@ class Terminal {
         }
         const margin = 10
         if (activeTab != null) {
-            activeTab.style.height = ''
+            activeTab.style.paddingBottom = "5px";
             let b = activeTab.getBoundingClientRect()
-            console.log(b)
-
             let columns = Math.floor((b.width-margin)/char_width)
             let rows = Math.floor((b.height-margin)/char_height)
             
+            let padding = (b.height-margin) - (rows*char_height)
+            this.tabElement.style.paddingBottom = padding + "px";
+            activeTab.style.paddingBottom = padding + "px";
+
             if (columns != this.columns || rows != this.rows) {
                 this.columns = columns
                 this.rows = rows
                 console.log(rows, columns, char_width, char_height)
                 this.socket.send(JSON.stringify({"type":"size", "columns": columns, "rows": rows}))
             }
-            activeTab.style.height = (rows*char_height+1).toString() + 'px'
         }
     }
 }

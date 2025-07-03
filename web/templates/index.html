@@ -14,7 +14,6 @@
     <script>
         htmx.defineExtension('ask', {
             onEvent: function(name, event) {
-                console.log("kuuurczaki")
                 if (name !== 'htmx:configRequest')
                     return;        
 
@@ -44,6 +43,9 @@
                 this.innerHTML = "↕️"
                 article.classList.add("vertical");
             }
+            sockets.forEach(function(term, sessionId) {
+                term.UpdateSize()
+            });
         }
     </script>
   </head>
