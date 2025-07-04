@@ -248,6 +248,7 @@
                     evt.target.parentNode.addEventListener('click', function(e) {
                         makeItActive(this)
                     });
+                    evt.target.scrollTop = evt.target.scrollHeight - evt.target.clientHeight
                 });
                 document.body.addEventListener('htmx:wsClose', function(evt) {
                     let sessionId =  evt.target.getElementsByTagName("code")[0].id

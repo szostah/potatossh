@@ -2,12 +2,14 @@ var char_width = 0.0;
 var char_height = 0.0;
 
 function UpdateFontDimensions() {
-    const span = document.createElement("code");
-    span.innerHTML = "X<br>Y<br>Z<br>X<br>Y<br>Z<br>X<br>Y<br>Z<br>X"
-    document.body.appendChild(span);
-    char_width = span.getBoundingClientRect().width;
-    char_height = span.getBoundingClientRect().height/10.0;
-    document.body.removeChild(span);
+    const code = document.createElement("code");
+    const samples = 64;
+    const elements = Array(samples).fill("J")
+    code.innerHTML = elements.join("<br>")
+    document.body.appendChild(code);
+    char_width = code.getBoundingClientRect().width;
+    char_height = code.getBoundingClientRect().height/samples;
+    document.body.removeChild(code);
 }
 
 document.addEventListener("DOMContentLoaded", function(event) {
@@ -46,16 +48,15 @@ class Terminal {
                 activeTab = tabInputs[i].nextElementSibling
             }
         }
-        const margin = 10
         if (activeTab != null) {
             activeTab.style.paddingBottom = "5px";
             let b = activeTab.getBoundingClientRect()
-            let columns = Math.floor((b.width-margin)/char_width)
-            let rows = Math.floor((b.height-margin)/char_height)
+            let columns = Math.floor(b.width/char_width)
+            let rows = Math.floor(b.height/char_height)
             
-            let padding = (b.height-margin) - (rows*char_height)
-            this.tabElement.style.paddingBottom = padding + "px";
-            activeTab.style.paddingBottom = padding + "px";
+            let bottomPadding = b.height - (rows*char_height)
+            this.tabElement.style.paddingBottom = bottomPadding + "px";
+            activeTab.style.paddingBottom = bottomPadding + "px";
 
             if (columns != this.columns || rows != this.rows) {
                 this.columns = columns
