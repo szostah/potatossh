@@ -56,50 +56,23 @@ func connectToHost(user, host, pass string) (*ssh.Client, *ssh.Session, error) {
 }
 
 func NewSession(server database.Server, template *template.Template) (*Session, error) {
-	client, session, err := connectToHost(server.User, fmt.Sprintf("%s:%d", server.Address, server.Port), server.Password)
-	if err != nil {
-		return nil, err
-	}
-
-	// session input and output
-	serverIn, err := session.StdinPipe()
-	if err != nil {
-		return nil, err
-	}
-	serverOut, err := session.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
 
 	return &Session{
 		Id:          uuid.New().String(),
 		ws_conn:     nil,
-		ssh_client:  client,
-		ssh_session: session,
-		stdin:       serverIn,
-		stdout:      serverOut,
+		ssh_client:  nil,
+		ssh_session: nil,
+		stdin:       nil,
+		stdout:      nil,
 		Server:      server,
 		new_data:    make(chan rune),
 		ws_done:     nil,
-		term:        terminal.NewTerminal(serverIn, server.Name),
+		term:        terminal.NewTerminal(server.Name),
 		template:    template,
 	}, nil
 }
 
 func (s *Session) Start() error {
-	modes := ssh.TerminalModes{
-		ssh.ECHO:          1,     // enable echoing
-		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
-		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
-	}
-
-	if err := s.ssh_session.RequestPty("xterm-256color", 40, 80, modes); err != nil {
-		return err
-	}
-
-	if err := s.ssh_session.Shell(); err != nil {
-		return err
-	}
 
 	fmt.Printf("Staring session %s with %s (%s).\n", s.Id, s.Server.Name, s.Server.Address)
 
@@ -130,12 +103,56 @@ func (s *Session) AttachWebSocket(w http.ResponseWriter, r *http.Request) error 
 }
 
 func (s *Session) Disconnect() {
+	s.ws_conn.Close()
 	s.ssh_client.Close()
 	s.ssh_session.Close()
-	s.ws_conn.Close()
+}
+
+func (s *Session) connect() error {
+	// connect
+	var err error
+	s.ssh_client, s.ssh_session, err = connectToHost(s.Server.User, fmt.Sprintf("%s:%d", s.Server.Address, s.Server.Port), s.Server.Password)
+	if err != nil {
+		return err
+	}
+
+	// pipes
+	s.stdin, err = s.ssh_session.StdinPipe()
+	if err != nil {
+		return err
+	}
+	s.stdout, err = s.ssh_session.StdoutPipe()
+	if err != nil {
+		return err
+	}
+
+	s.term.Connected(s.stdin)
+
+	modes := ssh.TerminalModes{
+		ssh.ECHO:          1,     // enable echoing
+		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
+		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
+	}
+
+	rows, columns := s.term.GetSize()
+	err = s.ssh_session.RequestPty("xterm-256color", rows, columns, modes)
+	if err != nil {
+		return err
+	}
+
+	err = s.ssh_session.Shell()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Session) collectStdOut() {
+	err := s.connect()
+	if err != nil {
+		return
+	}
+
 	// producer
 	reader := bufio.NewReader(s.stdout)
 	for {
@@ -243,15 +260,20 @@ func (s *Session) sendStdin() {
 				break
 			}
 		} else if msg.Type == "size" {
-			err := s.ssh_session.WindowChange(msg.Rows, msg.Columns)
-			if err != nil {
-				fmt.Println("WindowChange error:", err)
-				continue
-			}
-			s.term.SetSize(msg.Rows, msg.Columns)
+			s.updateSize(msg.Rows, msg.Columns)
 		}
 	}
 	close(s.ws_done)
+}
+
+func (s *Session) updateSize(rows, cols int) {
+	if s.ssh_session != nil {
+		err := s.ssh_session.WindowChange(rows, cols)
+		if err != nil {
+			fmt.Println("WindowChange error:", err)
+		}
+	}
+	s.term.SetSize(rows, cols)
 }
 
 func (s *Session) InjectStdin(bytes []byte) error {

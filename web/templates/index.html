@@ -10,7 +10,8 @@
     <script src="https://unpkg.com/htmx-ext-ws@2.0.2" crossorigin="anonymous"></script>
     <script src="static/keyboard.js"></script>
     <script src="static/terminal.js"></script>
-    <title>🥔 PotatoSSH</title>
+    <link rel="icon" href="static/favicon.svg" />
+    <title>PotatoSSH</title>
     <script>
         htmx.defineExtension('ask', {
             onEvent: function(name, event) {
@@ -119,18 +120,18 @@
                                     <li class="server">
                                         <header>
                                             {{ if openInNewWindowEnabled }}
-                                            <span hx-post="/connection/{{ .Server.ID }}" hx-vals='{"newwindow": "true"}' hx-target="#workspace">{{ .Name }}</span>
+                                            <span hx-post="/connection/{{ .Server.ID }}" hx-vals='{"newwindow": "true"}' hx-swap="none" hx-on::before-request="unactiveWindow()">{{ .Name }}</span>
                                             {{ else }}
-                                            <span hx-post="/connection/{{ .Server.ID }}" hx-target="#workspace">{{ .Name }}</span>
+                                            <span hx-post="/connection/{{ .Server.ID }}" hx-swap="none">{{ .Name }}</span>
                                             {{ end }}
                                         </header>
                                         <button>⋮</button>
                                         <menu>
                                             <div class="toolbar">
                                                 {{ if openInNewWindowEnabled }}
-                                                <button title="Open in new tab" hx-post="/connection/{{ .Server.ID }}" hx-target="#workspace">🗂️</button>
+                                                <button title="Open in new tab" hx-post="/connection/{{ .Server.ID }}" hx-swap="none">🗂️</button>
                                                 {{ else }}
-                                                <button title="Open in new window" hx-post="/connection/{{ .Server.ID }}" hx-vals='{"newwindow": "true"}' hx-target="#workspace">🪟</button>
+                                                <button title="Open in new window" hx-post="/connection/{{ .Server.ID }}" hx-vals='{"newwindow": "true"}' hx-swap="none" hx-on::before-request="unactiveWindow()">🪟</button>
                                                 {{ end }}
                                                 <button title="Edit">✏️</button>
                                                 <button title="Delete" hx-delete="/server/{{ .Server.ID }}" hx-target="nav > ul" hx-confirm="Delete {{ .Server.Name }}?">🗑️</button>
@@ -183,7 +184,7 @@
                 {{ block "workspace" .Windows }}
                     {{ $windows := . }}
                     {{ range $i, $w := . }}
-                    <div data-id="{{ $i }}" {{ if $w.Active }}class="active"{{ end }}>
+                    <div id="window_{{ $i }}" data-id="{{ $i }}" {{ if $w.Active }}class="active"{{ end }}>
                         <header class="wheader">
                             {{ $tablen := len $w.Tabs }}
                             {{ $lasttab := len (slice (printf "%*s" $tablen "") 1)}}
@@ -194,9 +195,9 @@
                                 <button class="close" title="Move">🗗</button>
                                 <menu>
                                     <div class="toolbar">
-                                        <button {{ if ne $j 0 }}hx-post="/move/left/{{ $sessionid }}" hx-target="#workspace"{{ else }}disabled{{ end }} title="Move tab to left">⬅</button>
-                                        <button {{ if gt $tablen 1 }}hx-post="/move/newwindow/{{ $sessionid }}" hx-target="#workspace"{{ else }}disabled{{ end }} title="New window">🗖</button>
-                                        <button {{ if lt $j $lasttab }}hx-post="/move/right/{{ $sessionid }}" hx-target="#workspace"{{ else }}disabled{{ end }} title="Move tab to right">➡</button>
+                                        <button {{ if ne $j 0 }}hx-post="/move/left/{{ $sessionid }}" hx-swap="none"{{ else }}disabled{{ end }} title="Move tab to left">⬅</button>
+                                        <button {{ if gt $tablen 1 }}hx-post="/move/newwindow/{{ $sessionid }}" hx-swap="none" hx-on::before-request="unactiveWindow()"{{ else }}disabled{{ end }} title="New window">🗖</button>
+                                        <button {{ if lt $j $lasttab }}hx-post="/move/right/{{ $sessionid }}" hx-swap="none"{{ else }}disabled{{ end }} title="Move tab to right">➡</button>
                                     </div>
                                     <div class="minigrid">
                                         {{ range $k, $w := $windows }}
@@ -221,6 +222,84 @@
                     {{ end }}
                 {{ end }}
             </section>
+            {{ define "update_window" }}
+                {{ $i := .Id }}
+                {{ $windows := .Windows }}
+                {{ $w := index .Windows $i}}
+                <div hx-swap-oob="true" id="window_{{ $i }}" data-id="{{ $i }}" {{ if $w.Active }}class="active"{{ end }}>
+                    <header class="wheader">
+                        {{ $tablen := len $w.Tabs }}
+                        {{ $lasttab := len (slice (printf "%*s" $tablen "") 1)}}
+                        {{ range $j, $t := $w.Tabs }}
+                        {{ $sessionid := $t.Session.Id }}
+                        <label hx-ext="ask" id="title_{{ $sessionid }}" for="tab_{{ $sessionid }}" title="{{ .Server.Name }}" hx-trigger="dblclick" hx-post="/title/{{ $sessionid }}" hx-ask="New title (leave blank to re-enable dynamic title):" hx-ask-default="{{ .Session.Terminal.Title }}">💻 {{ .Session.Terminal.Title }}</label>
+                        <div class="wbuttons">
+                            <button class="close" title="Move">🗗</button>
+                            <menu>
+                                <div class="toolbar">
+                                    <button {{ if ne $j 0 }}hx-post="/move/left/{{ $sessionid }}" hx-swap="none"{{ else }}disabled{{ end }} title="Move tab to left">⬅</button>
+                                    <button {{ if gt $tablen 1 }}hx-post="/move/newwindow/{{ $sessionid }}" hx-swap="none" hx-on::before-request="unactiveWindow()"{{ else }}disabled{{ end }} title="New window">🗖</button>
+                                    <button {{ if lt $j $lasttab }}hx-post="/move/right/{{ $sessionid }}" hx-swap="none"{{ else }}disabled{{ end }} title="Move tab to right">➡</button>
+                                </div>
+                                <div class="minigrid">
+                                    {{ range $k, $w := $windows }}
+                                    {{ $windowname := len (printf "a%*s" $k "") }}
+                                    <div {{ if ne $i $k }}hx-post="/move/window/{{ $sessionid }}/{{ $k }}" hx-target="#workspace"{{ end }} title="Switch to window {{ $windowname }}" {{ if eq $i $k }}class="disabled"{{ end }}>{{ $windowname }}</div>
+                                    {{ end }}
+                                </div>
+                            </menu>
+                            <button hx-delete="/connection/{{ $sessionid }}" hx-target="#workspace" class="close" title="Close">✖</button>
+                        </div>
+                        {{ end }}
+                    </header>
+                    {{range $w.Tabs}}
+                        <input id="tab_{{ .Session.Id }}" type="radio" name="tabs{{ $i }}" {{ if .Checked }}checked{{ end }} hx-post="/active/tab/{{ .Session.Id }}">
+                        <div class="tab" hx-ext="ws" ws-connect="/connection/{{ .Session.Id }}">
+                        {{ template "codeblock" .Session }}
+                        </div>
+                    {{ end }}
+                </div>
+            {{ end }}
+            {{ define "new_window" }}
+            <section hx-swap-oob="beforeend:#workspace">
+                {{ $i := .Id }}
+                {{ $windows := .Windows }}
+                {{ $w := index .Windows $i}}
+                <div id="window_{{ $i }}" data-id="{{ $i }}" {{ if $w.Active }}class="active pop"{{ else }}class="pop"{{ end }}>
+                    <header class="wheader">
+                        {{ $tablen := len $w.Tabs }}
+                        {{ $lasttab := len (slice (printf "%*s" $tablen "") 1)}}
+                        {{ range $j, $t := $w.Tabs }}
+                        {{ $sessionid := $t.Session.Id }}
+                        <label hx-ext="ask" id="title_{{ $sessionid }}" for="tab_{{ $sessionid }}" title="{{ .Server.Name }}" hx-trigger="dblclick" hx-post="/title/{{ $sessionid }}" hx-ask="New title (leave blank to re-enable dynamic title):" hx-ask-default="{{ .Session.Terminal.Title }}">💻 {{ .Session.Terminal.Title }}</label>
+                        <div class="wbuttons">
+                            <button class="close" title="Move">🗗</button>
+                            <menu>
+                                <div class="toolbar">
+                                    <button {{ if ne $j 0 }}hx-post="/move/left/{{ $sessionid }}" hx-swap="none"{{ else }}disabled{{ end }} title="Move tab to left">⬅</button>
+                                    <button {{ if gt $tablen 1 }}hx-post="/move/newwindow/{{ $sessionid }}" hx-swap="none" hx-on::before-request="unactiveWindow()"{{ else }}disabled{{ end }} title="New window">🗖</button>
+                                    <button {{ if lt $j $lasttab }}hx-post="/move/right/{{ $sessionid }}" hx-swap="none"{{ else }}disabled{{ end }} title="Move tab to right">➡</button>
+                                </div>
+                                <div class="minigrid">
+                                    {{ range $k, $w := $windows }}
+                                    {{ $windowname := len (printf "a%*s" $k "") }}
+                                    <div {{ if ne $i $k }}hx-post="/move/window/{{ $sessionid }}/{{ $k }}" hx-target="#workspace"{{ end }} title="Switch to window {{ $windowname }}" {{ if eq $i $k }}class="disabled"{{ end }}>{{ $windowname }}</div>
+                                    {{ end }}
+                                </div>
+                            </menu>
+                            <button hx-delete="/connection/{{ $sessionid }}" hx-target="#workspace" class="close" title="Close">✖</button>
+                        </div>
+                        {{ end }}
+                    </header>
+                    {{range $w.Tabs}}
+                        <input id="tab_{{ .Session.Id }}" type="radio" name="tabs{{ $i }}" {{ if .Checked }}checked{{ end }} hx-post="/active/tab/{{ .Session.Id }}">
+                        <div class="tab" hx-ext="ws" ws-connect="/connection/{{ .Session.Id }}">
+                        {{ template "codeblock" .Session }}
+                        </div>
+                    {{ end }}
+                </div>
+            </section>
+            {{ end }}
             <script>
                 function makeItActive(target) {
                     if (!target.classList.contains("active")) {
@@ -239,9 +318,18 @@
                         xhttp.send()
                     }
                 }
+                function unactiveWindow() {
+                    let active = document.querySelector(".active")
+                    if (active != null) {
+                        active.classList.remove("active");
+                    }
+                }
                 const sockets = new Map();
                 document.body.addEventListener('htmx:wsOpen', function(evt) {
                     let sessionId =  evt.target.getElementsByTagName("code")[0].id
+                    sockets.forEach(function(term, sessionId) {
+                        term.UpdateSize()
+                    });
                     const terminal = new Terminal(sessionId, evt.target, evt.detail.socketWrapper)
                     sockets.set(sessionId, terminal)
                     // makeItActive(evt.target.parentNode)

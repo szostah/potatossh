@@ -170,22 +170,24 @@ func (app *App) ConnectionRequest(w http.ResponseWriter, r *http.Request) {
 			}
 			app.Windows = append(app.Windows, Window{Tabs: []Tab{{Server: &server, Session: session, Checked: true}}, Active: true})
 			app.ActiveWindow = uint(len(app.Windows) - 1)
+			app.Template.ExecuteTemplate(w, "new_window", map[string]any{"Windows": app.Windows, "Id": app.ActiveWindow})
 		} else {
 			if len(app.Windows) == 0 {
 				app.Windows = append(app.Windows, Window{Tabs: []Tab{{Server: &server, Session: session, Checked: true}}, Active: true})
 				app.ActiveWindow = 0
+				app.Template.ExecuteTemplate(w, "new_window", map[string]any{"Windows": app.Windows, "Id": app.ActiveWindow})
 			} else {
 				app.Windows[app.ActiveWindow].Tabs = append(app.Windows[app.ActiveWindow].Tabs, Tab{Server: &server, Session: session, Checked: false})
+				app.Template.ExecuteTemplate(w, "update_window", map[string]any{"Windows": app.Windows, "Id": app.ActiveWindow})
 			}
 		}
 		app.SessionWindowMap[session.Id] = app.ActiveWindow
 		app.Sessions[session.Id] = session
-		app.Template.ExecuteTemplate(w, "workspace", app.Windows)
 	} else if r.Method == http.MethodGet {
 		sessionId := r.PathValue("id")
 		session, ok := app.Sessions[sessionId]
 		if !ok {
-			http.Error(w, "Requested session doesn't exist.", http.StatusBadRequest)
+			http.Error(w, "Requested session doesn't exist.", http.StatusNotFound)
 			return
 		}
 		err := session.AttachWebSocket(w, r)
@@ -211,6 +213,8 @@ func (app *App) ConnectionRequest(w http.ResponseWriter, r *http.Request) {
 					app.Windows[0].Active = true
 					app.ActiveWindow = 0
 				}
+			} else if windowId < app.ActiveWindow {
+				app.ActiveWindow -= 1
 			}
 			app.RemoveWindow(windowId)
 		} else {
@@ -279,9 +283,11 @@ func (app *App) SetActiveWindow(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Can not parse id", http.StatusBadRequest)
 			return
 		}
-		app.Windows[app.ActiveWindow].Active = false
-		app.Windows[windowId].Active = true
-		app.ActiveWindow = uint(windowId)
+		if windowId < len(app.Windows) {
+			app.Windows[app.ActiveWindow].Active = false
+			app.Windows[windowId].Active = true
+			app.ActiveWindow = uint(windowId)
+		}
 	} else {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -306,23 +312,26 @@ func (app *App) MoveTab(w http.ResponseWriter, r *http.Request) {
 			app.Windows[app.ActiveWindow].Active = false
 			app.Windows[app.ActiveWindow].Tabs = append(app.Windows[app.ActiveWindow].Tabs[:idx], app.Windows[app.ActiveWindow].Tabs[idx+1:]...)
 			tab.Checked = true
+			app.Template.ExecuteTemplate(w, "update_window", map[string]any{"Windows": app.Windows, "Id": app.ActiveWindow})
 			new_window := Window{Tabs: []Tab{tab}, Active: true}
 			app.Windows = append(app.Windows, new_window)
 			app.SessionWindowMap[sessionId] = uint(len(app.Windows) - 1)
 			app.ActiveWindow = uint(len(app.Windows) - 1)
+			app.Template.ExecuteTemplate(w, "new_window", map[string]any{"Windows": app.Windows, "Id": app.ActiveWindow})
 		} else if action == "left" {
 			if idx > 0 {
 				app.Windows[app.ActiveWindow].Tabs[idx], app.Windows[app.ActiveWindow].Tabs[idx-1] = app.Windows[app.ActiveWindow].Tabs[idx-1], app.Windows[app.ActiveWindow].Tabs[idx]
+				app.Template.ExecuteTemplate(w, "update_window", map[string]any{"Windows": app.Windows, "Id": app.ActiveWindow})
 			}
 		} else if action == "right" {
 			if idx < len(app.Windows[app.ActiveWindow].Tabs)-1 {
 				app.Windows[app.ActiveWindow].Tabs[idx], app.Windows[app.ActiveWindow].Tabs[idx+1] = app.Windows[app.ActiveWindow].Tabs[idx+1], app.Windows[app.ActiveWindow].Tabs[idx]
+				app.Template.ExecuteTemplate(w, "update_window", map[string]any{"Windows": app.Windows, "Id": app.ActiveWindow})
 			}
 		} else {
 			http.Error(w, "Move tab action not allowed", http.StatusBadRequest)
 			return
 		}
-		app.Template.ExecuteTemplate(w, "workspace", app.Windows)
 	} else {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}

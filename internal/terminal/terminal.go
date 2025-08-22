@@ -7,6 +7,7 @@ import (
 
 type Terminal struct {
 	stdin            io.WriteCloser
+	connected        bool
 	title            string
 	staticTitle      string
 	TitleUpdate      bool
@@ -22,9 +23,10 @@ type Terminal struct {
 	altScreen        *Screen
 }
 
-func NewTerminal(stdin io.WriteCloser, title string) *Terminal {
+func NewTerminal(title string) *Terminal {
 	term := &Terminal{
-		stdin:            stdin,
+		stdin:            nil,
+		connected:        false,
 		title:            title,
 		staticTitle:      "",
 		TitleUpdate:      false,
@@ -40,6 +42,11 @@ func NewTerminal(stdin io.WriteCloser, title string) *Terminal {
 	term.screen = &Screen{term: term}
 	term.altScreen = &Screen{term: term}
 	return term
+}
+
+func (t *Terminal) Connected(stdin io.WriteCloser) {
+	t.stdin = stdin
+	t.connected = true
 }
 
 func (t *Terminal) ProcessCharacter(r rune) {
@@ -91,7 +98,14 @@ func (t *Terminal) SetSize(rows, cols int) bool {
 	return false
 }
 
+func (t *Terminal) GetSize() (int, int) {
+	return t.rows, t.columns
+}
+
 func (t *Terminal) String() string {
+	if !t.connected {
+		return "connecting..."
+	}
 	screen := t.GetScreen()
 	return screen.String()
 }

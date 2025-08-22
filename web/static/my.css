@@ -71,6 +71,7 @@ section, .minigrid {
 
 section {
 	height: 100vh;
+	overflow: hidden;
 }
 
 .minigrid {
@@ -98,11 +99,25 @@ section {
 	cursor: not-allowed;
 }
 
+@keyframes pop {
+	0% {
+		transform: translateX(100%); 
+		}
+	100% {
+		transform: translateX(0%);
+	}
+}
+
+
 section > div {
 	margin: 10px;
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
+}
+
+section > div.pop {
+	animation: pop 0.3s ease-in;
 }
 
 .tab {
